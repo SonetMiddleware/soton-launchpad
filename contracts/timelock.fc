@@ -1,0 +1,45 @@
+#pragma version >=0.2.0;
+
+#include "common/messages.func";
+#include "common/stdlib.func";
+#include "common/messages.func";
+
+()save_data(int end_time, slice owner){
+  set_data(begin_cell()
+    .store_uint(end_time, 64)
+    .store_slice(owner)
+    .end_cell()
+  );
+}
+
+(int, slice)load_data(){
+  var ds = get_data().begin_parse();
+  return
+    (
+      ds~load_uint(64), ;; end time
+      ds~load_msg_addr() ;; owner_address
+    );
+}
+
+()recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+    return ();
+  }
+
+  var cs = in_msg_full.begin_parse();
+  var flags = cs~load_uint(4);
+
+  if (flags & 1) {
+    return ();
+  }
+
+  slice sender_address = cs~load_msg_addr();
+  (int end_time, slice owner) = load_data();
+
+  throw_unless(402, equal_slices(sender_address, owner));
+  throw_unless(403, now() <= end_time);
+
+  (slice dest, cell payload) = (in_msg_body~load_msg_addr(), in_msg_body~load_ref());
+  ;; forward msg
+  send_simple_message(my_balance, dest, payload, CARRY_ALL_BALANCE | IGNORE_ERRORS);
+}

@@ -1,0 +1,127 @@
+#pragma version >=0.2.0;
+
+#include "common/stdlib.func";
+#include "common/messages.func";
+#include "common/jetton-utils.func";
+
+const transfer = 0xf8a7ea5;
+const transfer_notification = 0x7362d09c;
+const base = 1000000;
+
+;; exRate decimal is 6
+() save_data(int release_time, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap, int received,
+  cell jetton_wallet_code, cell timelock_code, slice owner){
+  set_data(begin_cell()
+    .store_uint(release_time, 64)
+    .store_uint(ex_rate, 64)
+    .store_slice(source_jetton_address)
+    .store_slice(sell_jetton_address)
+    .store_uint(cap, 64)
+    .store_uint(received, 64)
+    .store_ref(jetton_wallet_code)
+    .store_ref(timelock_code)
+    .store_slice(owner)
+    .end_cell()
+  );
+}
+
+(int, int, slice, slice, int, int, cell, cell, slice) load_data(){
+  var ds = get_data().begin_parse();
+  return
+    (
+      ds~load_uint(64), ;; end time
+      ds~load_uint(64), ;; exchange rate
+      ds~load_msg_addr(), ;; source jetton
+      ds~load_msg_addr(), ;; sold jetton
+      ds~load_uint(64), ;; cap
+      ds~load_uint(64), ;; the amount of received source Jetton
+      ds~load_ref(), ;; jetton wallet code
+      ds~load_ref(), ;; time lock code
+      ds~load_msg_addr() ;; owner
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+  if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+    return ();
+  }
+
+  var cs = in_msg_full.begin_parse();
+  var flags = cs~load_uint(4);
+
+  if (flags & 1) {
+    return ();
+  }
+
+  slice sender_address = cs~load_msg_addr();
+  cs~load_msg_addr(); ;; skip dst
+  cs~load_coins(); ;; skip value
+  cs~skip_bits(1); ;; skip extracurrency collection
+  cs~load_coins(); ;; skip ihr_fee
+  int fwd_fee = cs~load_coins();
+
+  force_chain(sender_address);
+
+  (int op, int query_id) = (in_msg_body~load_uint(32), in_msg_body~load_uint(64));
+  (int release_time, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap,
+    int received, cell jetton_wallet_code, cell timelock_code, slice owner) = load_data();
+  var source_jetton_wallet = calculate_user_jetton_wallet_address(my_address(), source_jetton_address, jetton_wallet_code);
+  var sold_jetton_wallet = calculate_user_jetton_wallet_address(my_address(), sell_jetton_address, jetton_wallet_code);
+  if(op == transfer_notification) { ;; receive source Jetton
+    ;; ignore other Jetton
+    if(equal_slices(sender_address, source_jetton_wallet)) {
+      ;; ended
+      throw_unless(300, release_time >= now());
+      (int jetton_amount, slice from_user) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+      ;; exceed max cap
+      throw_unless(301, received + jetton_amount <= cap);
+      ;; calculate amount out
+      int out_amount = jetton_amount * ex_rate / base;
+      ;; send jetton to time lock
+      var body = create_simple_transfer_body(query_id, 0, out_amount,
+        calculate_time_lock_addr(timelock_code, release_time, from_user));
+      body = body.store_uint(0, 32); ;; append exit code
+      send_simple_message(my_balance, sold_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS | IGNORE_ERRORS);
+      received = received + jetton_amount;
+      save_data(release_time, ex_rate, source_jetton_address, sell_jetton_address, cap, received, jetton_wallet_code,
+        timelock_code, owner);
+    }
+    return ();
+  }
+  ;; only owner
+  throw_unless(302, equal_slices(owner, sender_address));
+  ;; ended
+  throw_unless(300, release_time < now());
+
+  if (op == 1) { ;; claim source Jetton
+    var body = create_simple_transfer_body(query_id, 0, received, owner);
+    body = body.store_uint(0, 32); ;; append exit code
+    send_simple_message(my_balance, source_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS | IGNORE_ERRORS);
+    return ();
+  }
+  if(op == 2) { ;; claim remained(unsold) Jetton
+    int remained = (cap - received) * ex_rate / base;
+    var body = create_simple_transfer_body(query_id, 0, remained, owner);
+    body = body.store_uint(0, 32); ;; append exit code
+    send_simple_message(my_balance, sold_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS | IGNORE_ERRORS);
+    return ();
+  }
+}
+
+(slice) calculate_time_lock_addr(cell time_lock_code, int end_time, slice owner) {
+  var data = begin_cell()
+    .store_uint(end_time, 64)
+    .store_slice(owner)
+    .end_cell();
+  var state_init = begin_cell()
+    .store_uint(0, 2)
+    .store_dict(time_lock_code)
+    .store_dict(data)
+    .store_uint(0, 1)
+    .end_cell();
+  return begin_cell().store_uint(4, 3)
+    .store_int(workchain(), 8)
+    .store_uint(cell_hash(state_init), 256)
+    .end_cell()
+    .begin_parse();
+}
