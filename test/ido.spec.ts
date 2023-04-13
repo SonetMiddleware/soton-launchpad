@@ -9,6 +9,7 @@ import {JETTON_MINTER_CODE, JETTON_WALLET_CODE, jettonMinterInitData} from "../b
 import {JettonWallet} from "./jetton-lib/jetton-wallet";
 import {WrappedSmartContract} from "./jetton-lib/wrapped-smart-contract";
 import {parseJettonWalletDetails} from "./jetton-lib/jetton-utils";
+import {actionToMessage} from "./jetton-lib/utils";
 
 chai.use(chaiBN(BN));
 
@@ -38,7 +39,8 @@ describe('test ido', async () => {
   let owner = randomAddress('owner');
   let account1 = randomAddress('account1');
   let launchpad: WrappedSmartContract;
-  let account1SourceJettonWallet: JettonWallet, launchpadSourceJettonWallet: JettonWallet;
+  let account1SourceJettonWallet: JettonWallet, launchpadSourceJettonWallet: JettonWallet,
+    launchpadSoldJettonWallet: JettonWallet;
   let account1TimeLock: WrappedSmartContract, account1TimeLockSoldJettonWallet: JettonWallet;
 
   before(async () => {
@@ -78,32 +80,53 @@ describe('test ido', async () => {
   });
   it('prepare Jetton', async () => {
     // mint source Jetton
-    await sourceJetton.contract.sendInternalMessage(
+    const {actionList: actionList1} = await sourceJetton.contract.sendInternalMessage(
       internalMessage({
         from: owner,
         body: JettonMinter.mintBody(account1, cap),
       })
     );
+    await account1SourceJettonWallet.contract.sendInternalMessage(
+      actionToMessage(sourceJetton.address, actionList1[0])
+    );
+    const {balance: balance1} = await parseJettonWalletDetails(
+      await account1SourceJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
+    )
+    expect(balance1).to.be.eq(BigInt(cap));
     // create launchpad contract
-    await launchpad.contract.sendInternalMessage(internalMessage({from: owner, value: toNano(1)}));
+    await launchpad.contract.sendInternalMessage(internalMessage({
+      from: owner,
+      value: toNano(1)
+    }));
     // mint sold Jetton to launchpad
-    await soldJetton.contract.sendInternalMessage(
+    const {actionList: actionList2} = await soldJetton.contract.sendInternalMessage(
       internalMessage({
         from: owner,
         body: JettonMinter.mintBody(launchpad.address, cap * exRate / base),
       })
     );
+    launchpadSoldJettonWallet = await getJWalletContract(launchpad.address, soldJetton.address);
+    await launchpadSoldJettonWallet.contract.sendInternalMessage(
+      actionToMessage(soldJetton.address, actionList2[0])
+    );
+    const {balance: balance2} = await parseJettonWalletDetails(
+      await launchpadSoldJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
+    )
+    expect(balance2).to.be.eq(BigInt(cap * exRate / base));
   });
   it('participate', async () => {
     // account1 transfer soma SourceJetton to launchpad
-    await account1SourceJettonWallet.contract.sendInternalMessage(
+    const res = await account1SourceJettonWallet.contract.sendInternalMessage(
       internalMessage({
         from: account1,
         body: JettonWallet.transferBody(launchpad.address, base),
-        value: toNano(0.031),
+        value: toNano('0.031'),
       })
     );
     launchpadSourceJettonWallet = await getJWalletContract(launchpad.address, sourceJetton.address);
+    await launchpadSourceJettonWallet.contract.sendInternalMessage(
+      actionToMessage(account1SourceJettonWallet.address, res.actionList[0])
+    );
     const {balance} = parseJettonWalletDetails(
       await launchpadSourceJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
     )
@@ -129,7 +152,7 @@ describe('test ido', async () => {
       internalMessage({
         from: account1,
         body: JettonWallet.transferBody(launchpad.address, base),
-        value: toNano(0.031),
+        value: toNano('0.031'),
       })
     );
     expect(res.type).to.be.eq('failed');

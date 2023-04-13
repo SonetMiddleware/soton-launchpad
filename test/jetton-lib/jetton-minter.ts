@@ -27,7 +27,7 @@ export class JettonMinter extends WrappedSmartContract {
       .storeUint(OPS.Mint, 32) // opcode (reference TODO)
       .storeUint(0, 64) // queryid
       .storeAddress(ownerAddress)
-      .storeCoins(toNano(0.2)) // gas fee
+      .storeCoins(toNano('0.2')) // gas fee
       .storeRef(
         // internal transfer message
         beginCell()

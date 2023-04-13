@@ -1,6 +1,6 @@
 import BN from "bn.js";
-import { Address, CommonMessageInfo, CellMessage, InternalMessage } from "ton";
-import { OutAction } from "ton-contract-executor";
+import {Address, toNano} from "ton";
+import {internal, OutAction} from "ton-contract-executor";
 
 export function actionToMessage(
   from: Address,
@@ -11,14 +11,11 @@ export function actionToMessage(
   //@ts-ignore
   const sendMessageAction = action as SendMsgOutAction;
 
-  let msg = new CommonMessageInfo({
-    body: new CellMessage(sendMessageAction.message?.body),
-  });
-  return new InternalMessage({
-    to: sendMessageAction.message?.info.dest,
-    from,
-    value: messageValue,
+  return internal({
+    dest: sendMessageAction.message?.info.dest,
+    src: from,
+    value: toNano(1000000000),
     bounce,
-    body: msg,
+    body: sendMessageAction.message?.body,
   });
 }
