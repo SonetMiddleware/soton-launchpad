@@ -105,3 +105,5 @@ dist
 
 build/*.cell
 build/*.fif
+build/*.boc
+.idea
