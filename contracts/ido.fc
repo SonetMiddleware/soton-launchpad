@@ -12,12 +12,16 @@ const base = 1000000;
 () save_data(int release_time, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap, int received,
   cell jetton_wallet_code, cell timelock_code, slice owner){
   set_data(begin_cell()
-    .store_uint(release_time, 64)
-    .store_uint(ex_rate, 64)
+    .store_ref(
+      begin_cell()
+        .store_uint(release_time, 64)
+        .store_uint(ex_rate, 64)
+        .store_uint(cap, 64)
+        .store_uint(received, 64)
+        .end_cell()
+    )
     .store_slice(source_jetton_address)
     .store_slice(sell_jetton_address)
-    .store_uint(cap, 64)
-    .store_uint(received, 64)
     .store_ref(jetton_wallet_code)
     .store_ref(timelock_code)
     .store_slice(owner)
@@ -27,14 +31,15 @@ const base = 1000000;
 
 (int, int, slice, slice, int, int, cell, cell, slice) load_data(){
   var ds = get_data().begin_parse();
+  var uint_data = ds~load_ref().begin_parse();
   return
     (
-      ds~load_uint(64), ;; end time
-      ds~load_uint(64), ;; exchange rate
+      uint_data~load_uint(64), ;; end time
+      uint_data~load_uint(64), ;; exchange rate
       ds~load_msg_addr(), ;; source jetton
       ds~load_msg_addr(), ;; sold jetton
-      ds~load_uint(64), ;; cap
-      ds~load_uint(64), ;; the amount of received source Jetton
+      uint_data~load_uint(64), ;; cap
+      uint_data~load_uint(64), ;; the amount of received source Jetton
       ds~load_ref(), ;; jetton wallet code
       ds~load_ref(), ;; time lock code
       ds~load_msg_addr() ;; owner
@@ -124,4 +129,9 @@ const base = 1000000;
     .store_uint(cell_hash(state_init), 256)
     .end_cell()
     .begin_parse();
+}
+
+
+(int, int, slice, slice, int, int, cell, cell, slice) get_info() method_id {
+  return load_data();
 }
