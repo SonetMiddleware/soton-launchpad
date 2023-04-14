@@ -4,7 +4,7 @@
 #include "common/stdlib.func";
 #include "common/messages.func";
 
-()save_data(int end_time, slice owner){
+()save_data(int end_time, slice owner) impure inline {
   set_data(begin_cell()
     .store_uint(end_time, 64)
     .store_slice(owner)
@@ -37,7 +37,7 @@
   (int end_time, slice owner) = load_data();
 
   throw_unless(402, equal_slices(sender_address, owner));
-  throw_unless(403, now() <= end_time);
+  throw_unless(403, now() > end_time);
 
   (slice dest, cell payload) = (in_msg_body~load_msg_addr(), in_msg_body~load_ref());
   ;; forward msg

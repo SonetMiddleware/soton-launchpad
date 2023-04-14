@@ -33,7 +33,7 @@ const getJWalletContract = async (
 
 describe('test ido', async () => {
   let timelockCode = Cell.fromBoc(fs.readFileSync("build/timelock.cell"))[0];
-  let releaseTime = Math.floor(Date.now() / 1000 + 10);
+  let releaseTime = Math.floor(Date.now() / 1000 + 5);
   let exRate = base * 2; // 1 source = 2 sold
   let sourceJetton: JettonMinter, soldJetton: JettonMinter;
   let cap = base * base;
@@ -97,7 +97,7 @@ describe('test ido', async () => {
     const {actionList: actionList1} = await sourceJetton.contract.sendInternalMessage(
       internalMessage({
         from: owner,
-        body: JettonMinter.mintBody(account1, cap),
+        body: JettonMinter.mintBody(account1, cap*2),
       })
     );
     await account1SourceJettonWallet.contract.sendInternalMessage(
@@ -106,7 +106,7 @@ describe('test ido', async () => {
     const {balance: balance1} = await parseJettonWalletDetails(
       await account1SourceJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
     )
-    expect(balance1).to.be.eq(BigInt(cap));
+    expect(balance1).to.be.eq(BigInt(cap*2));
     // mint sold Jetton to launchpad
     const {actionList: actionList2} = await soldJetton.contract.sendInternalMessage(
       internalMessage({
@@ -170,10 +170,38 @@ describe('test ido', async () => {
     expect(accountBalance).to.be.eq(BigInt(base * exRate / base));
     const launchpadData = await launchpad.contract.invokeGetMethod("get_info", []);
     const received = launchpadData.result[5] as bigint;
-    console.log(launchpadData.type, launchpadData.exit_code, launchpadData.result);
     expect(received).to.be.eq(BigInt(base));
   });
-  it('cannot participate after end time', async () => {
+  it('refund when participated amount exceeds cap', async () => {
+    // account1 transfer soma SourceJetton to launchpad
+    const res = await account1SourceJettonWallet.contract.sendInternalMessage(
+      internalMessage({
+        from: account1,
+        body: JettonWallet.transferBody(launchpad.address, cap, toNano('0.1')),
+        value: toNano('1'),
+      })
+    );
+    const res1 = await launchpadSourceJettonWallet.contract.sendInternalMessage(
+      actionToMessage(account1SourceJettonWallet.address, res.actionList[0])
+    );
+    const res2 = await launchpad.contract.sendInternalMessage(
+      actionToMessage(launchpadSourceJettonWallet.address, res1.actionList[0])
+    );
+    // launchpadSourceJettonWallet execute refund
+    const res3 = await launchpadSourceJettonWallet.contract.sendInternalMessage(
+      actionToMessage(launchpad.address, res2.actionList[0])
+    );
+    // refund to account1SourceJettonWallet
+    await account1SourceJettonWallet.contract.sendInternalMessage(
+      actionToMessage(launchpadSourceJettonWallet.address, res3.actionList[0])
+    );
+    const {balance} = parseJettonWalletDetails(
+      await launchpadSourceJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
+    )
+    // balance not changed
+    expect(balance).to.be.eq(BigInt(base));
+  })
+  it('refund when participating after end time', async () => {
     for (; ;) {
       await sleep(1000);
       if (Date.now() / 1000 > releaseTime) {
@@ -185,8 +213,8 @@ describe('test ido', async () => {
     const res = await account1SourceJettonWallet.contract.sendInternalMessage(
       internalMessage({
         from: account1,
-        body: JettonWallet.transferBody(launchpad.address, base),
-        value: toNano('0.1'),
+        body: JettonWallet.transferBody(launchpad.address, base, toNano('0.1')),
+        value: toNano('1'),
       })
     );
     const res1 = await launchpadSourceJettonWallet.contract.sendInternalMessage(
@@ -195,59 +223,81 @@ describe('test ido', async () => {
     const res2 = await launchpad.contract.sendInternalMessage(
       actionToMessage(launchpadSourceJettonWallet.address, res1.actionList[0])
     );
-    expect(res2.type).to.be.eq('failed');
-    expect(res2.exit_code).to.be.eq(300);
+    // launchpadSourceJettonWallet execute refund
+    const res3 = await launchpadSourceJettonWallet.contract.sendInternalMessage(
+      actionToMessage(launchpad.address, res2.actionList[0])
+    );
+    // refund to account1SourceJettonWallet
+    await account1SourceJettonWallet.contract.sendInternalMessage(
+      actionToMessage(launchpadSourceJettonWallet.address, res3.actionList[0])
+    );
     const {balance} = parseJettonWalletDetails(
       await launchpadSourceJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
     )
     // balance not changed
-    expect(balance).to.be.eq(base);
+    expect(balance).to.be.eq(BigInt(base));
   })
   it('claim sold Jetton', async () => {
-    await account1TimeLock.contract.sendInternalMessage(internalMessage({
+    const acc1SoldJettonWallet = await getJWalletContract(account1, soldJetton.address);
+    const {balance: balanceBefore} = parseJettonWalletDetails(
+      await acc1SoldJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
+    )
+    expect(balanceBefore).to.be.eq(BigInt(0));
+    const res = await account1TimeLock.contract.sendInternalMessage(internalMessage({
       from: account1, value: toNano(1),
       body: beginCell().storeAddress(account1TimeLockSoldJettonWallet.address)
         .storeRef(JettonWallet.transferBody(account1, base)).endCell()
     }))
-    const acc1SoldJettonWallet = await getJWalletContract(account1, soldJetton.address);
+    const res1 = await account1TimeLockSoldJettonWallet.contract.sendInternalMessage(
+      actionToMessage(account1TimeLock.address, res.actionList[0])
+    );
+    await acc1SoldJettonWallet.contract.sendInternalMessage(
+      actionToMessage(account1TimeLockSoldJettonWallet.address, res1.actionList[0])
+    );
     const {balance} = parseJettonWalletDetails(
       await acc1SoldJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
     )
-    expect(balance).to.be.eq(base);
+    expect(balance).to.be.eq(BigInt(base));
   });
   it('owner claim source Jetton', async () => {
     const {balance: balanceBefore} = parseJettonWalletDetails(
       await launchpadSourceJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
     );
-    await launchpad.contract.sendInternalMessage(internalMessage({
-      from: account1, value: toNano(1),
+    const res = await launchpad.contract.sendInternalMessage(internalMessage({
+      from: owner, value: toNano('1'),
       body: beginCell()
-        .storeUint(1, 64) // op
-        .storeUint(333, 64) // query id
+        .storeUint(1, 32) // op
+        .storeUint(0, 64) // query id
         .endCell()
     }));
+    await launchpadSourceJettonWallet.contract.sendInternalMessage(
+      actionToMessage(launchpad.address, res.actionList[0])
+    );
     const {balance: balanceAfter} = parseJettonWalletDetails(
       await launchpadSourceJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
     );
-    expect(balanceAfter.toNumber() - balanceBefore.toNumber()).to.be.eq(base)
+    expect(balanceBefore - balanceAfter).to.be.eq(BigInt(base))
     expect(balanceAfter).to.be.eq(BigInt(0))
   });
   it('owner claim unsold Jetton', async () => {
-    launchpadSoldJettonWallet = await getJWalletContract(launchpad.address, soldJetton.address);
     const {balance: balanceBefore} = parseJettonWalletDetails(
       await launchpadSoldJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
     );
-    await launchpad.contract.sendInternalMessage(internalMessage({
-      from: account1, value: toNano(1),
+    expect(balanceBefore).to.be.eq(BigInt((cap - base) * exRate / base));
+    const res = await launchpad.contract.sendInternalMessage(internalMessage({
+      from: owner, value: toNano('1'),
       body: beginCell()
-        .storeUint(2, 64) // op
-        .storeUint(333, 64) // query id
+        .storeUint(2, 32) // op
+        .storeUint(0, 64) // query id
+        .storeUint(balanceBefore, 64)
         .endCell()
     }));
+    await launchpadSoldJettonWallet.contract.sendInternalMessage(
+      actionToMessage(launchpad.address, res.actionList[0])
+    );
     const {balance: balanceAfter} = parseJettonWalletDetails(
       await launchpadSoldJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
     );
-    expect(balanceAfter.toNumber() - balanceBefore.toNumber()).to.be.eq((cap - base) * exRate / base)
-    expect(balanceAfter).to.be.eq(BigInt(0))
+    expect(balanceAfter).to.be.eq(BigInt(0));
   });
 });

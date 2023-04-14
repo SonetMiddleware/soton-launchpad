@@ -21,14 +21,14 @@ export function getWalletAddress(stack: any[]): Address {
 }
 
 interface JettonWalletDetails {
-  balance: BN;
+  balance: bigint;
   owner: Address;
   jettonMasterContract: Address; // Minter
 }
 
 export function parseJettonWalletDetails(execResult: { result: any[] }): JettonWalletDetails {
   return {
-    balance: execResult.result[0] as BN,
+    balance: execResult.result[0] as bigint,
     owner: (execResult.result[1] as Slice).loadAddress()!,
     jettonMasterContract: (execResult.result[2] as Slice).loadAddress()!,
   };

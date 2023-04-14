@@ -10,7 +10,7 @@ const base = 1000000;
 
 ;; exRate decimal is 6
 () save_data(int release_time, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap, int received,
-  cell jetton_wallet_code, cell timelock_code, slice owner){
+  cell jetton_wallet_code, cell timelock_code, slice owner) impure inline {
   set_data(begin_cell()
     .store_ref(
       begin_cell()
@@ -75,11 +75,16 @@ const base = 1000000;
   if(op == transfer_notification) { ;; receive source Jetton
     ;; ignore other Jetton
     throw_unless(300, equal_slices(sender_address, source_jetton_wallet));
-    ;; ended
-    throw_unless(301, release_time >= now());
     (int jetton_amount, slice from_user) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr());
-    ;; exceed max cap
-    throw_unless(302, received + jetton_amount <= cap);
+    ;; ended or exceed max cap
+    var ended = release_time < now();
+    var exceed = received + jetton_amount > cap;
+    if (ended | exceed) { ;; refund
+      var body = create_simple_transfer_body(query_id, 0, jetton_amount, from_user);
+      body = body.store_uint(0, 32); ;; append exit code
+      send_simple_message(0, source_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS);
+      return ();
+    }
     ;; calculate amount out
     int out_amount = jetton_amount * ex_rate / base;
     ;; send jetton to time lock
@@ -104,7 +109,7 @@ const base = 1000000;
     return ();
   }
   if(op == 2) { ;; claim remained(unsold) Jetton
-    int remained = (cap - received) * ex_rate / base;
+    int remained = in_msg_body~load_uint(64);
     var body = create_simple_transfer_body(query_id, 0, remained, owner);
     body = body.store_uint(0, 32); ;; append exit code
     send_simple_message(my_balance, sold_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS);
