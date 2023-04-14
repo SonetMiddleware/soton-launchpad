@@ -74,41 +74,40 @@ const base = 1000000;
   var sold_jetton_wallet = calculate_user_jetton_wallet_address(my_address(), sell_jetton_address, jetton_wallet_code);
   if(op == transfer_notification) { ;; receive source Jetton
     ;; ignore other Jetton
-    if(equal_slices(sender_address, source_jetton_wallet)) {
-      ;; ended
-      throw_unless(300, release_time >= now());
-      (int jetton_amount, slice from_user) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr());
-      ;; exceed max cap
-      throw_unless(301, received + jetton_amount <= cap);
-      ;; calculate amount out
-      int out_amount = jetton_amount * ex_rate / base;
-      ;; send jetton to time lock
-      var body = create_simple_transfer_body(query_id, 0, out_amount,
-        calculate_time_lock_addr(timelock_code, release_time, from_user));
-      body = body.store_uint(0, 32); ;; append exit code
-      send_simple_message(my_balance, sold_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS | IGNORE_ERRORS);
-      received = received + jetton_amount;
-      save_data(release_time, ex_rate, source_jetton_address, sell_jetton_address, cap, received, jetton_wallet_code,
-        timelock_code, owner);
-    }
+    throw_unless(300, equal_slices(sender_address, source_jetton_wallet));
+    ;; ended
+    throw_unless(301, release_time >= now());
+    (int jetton_amount, slice from_user) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+    ;; exceed max cap
+    throw_unless(302, received + jetton_amount <= cap);
+    ;; calculate amount out
+    int out_amount = jetton_amount * ex_rate / base;
+    ;; send jetton to time lock
+    var body = create_simple_transfer_body(query_id, 0, out_amount,
+      calculate_time_lock_addr(timelock_code, release_time, from_user));
+    body = body.store_uint(0, 32); ;; append exit code
+    send_simple_message(my_balance, sold_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS);
+    received += jetton_amount;
+    save_data(release_time, ex_rate, source_jetton_address, sell_jetton_address, cap, received, jetton_wallet_code,
+      timelock_code, owner);
     return ();
   }
   ;; only owner
-  throw_unless(302, equal_slices(owner, sender_address));
+  throw_unless(303, equal_slices(owner, sender_address));
   ;; ended
-  throw_unless(300, release_time < now());
+  throw_unless(301, release_time < now());
 
   if (op == 1) { ;; claim source Jetton
     var body = create_simple_transfer_body(query_id, 0, received, owner);
     body = body.store_uint(0, 32); ;; append exit code
-    send_simple_message(my_balance, source_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS | IGNORE_ERRORS);
+    send_simple_message(my_balance, source_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS);
     return ();
   }
   if(op == 2) { ;; claim remained(unsold) Jetton
     int remained = (cap - received) * ex_rate / base;
     var body = create_simple_transfer_body(query_id, 0, remained, owner);
     body = body.store_uint(0, 32); ;; append exit code
-    send_simple_message(my_balance, sold_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS | IGNORE_ERRORS);
+    send_simple_message(my_balance, sold_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS);
     return ();
   }
 }
@@ -134,4 +133,13 @@ const base = 1000000;
 
 (int, int, slice, slice, int, int, cell, cell, slice) get_info() method_id {
   return load_data();
+}
+
+(slice, slice) get_jetton_wallet_addr() method_id {
+  (int release_time, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap,
+    int received, cell jetton_wallet_code, cell timelock_code, slice owner) = load_data();
+
+  var source_jetton_wallet = calculate_user_jetton_wallet_address(my_address(), source_jetton_address, jetton_wallet_code);
+  var sold_jetton_wallet = calculate_user_jetton_wallet_address(my_address(), sell_jetton_address, jetton_wallet_code);
+  return (source_jetton_wallet, sold_jetton_wallet);
 }

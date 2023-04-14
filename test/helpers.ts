@@ -35,6 +35,7 @@ export function internalMessage(params: {
   bounce?: boolean;
   bounced?: boolean;
   body?: Cell
+  init?: { code: Cell, data: Cell }
 }) {
   return internal({
     src: params.from ?? randomAddress("sender"),
@@ -43,6 +44,7 @@ export function internalMessage(params: {
     bounce: params.bounce ?? true,
     bounced: params.bounced ?? false,
     body: params.body ?? new Cell(),
+    init: params.init ?? {code: new Cell(), data: new Cell()},
   });
 }
 
@@ -67,6 +69,7 @@ export function setNetworkConfig(contract: WrappedSmartContract) {
 export async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
 export function beginMessage(params: { op: number }): Builder {
   return beginCell()
     .storeUint(params.op, 32)

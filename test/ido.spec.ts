@@ -14,6 +14,8 @@ import {actionToMessage} from "./jetton-lib/utils";
 chai.use(chaiBN(BN));
 
 const base = 1000000;
+const op_transfer_notification = 0x7362d09c;
+const op_internal_transfer = 0x178D4519;
 
 const getJWalletContract = async (
   walletOwnerAddress: Address,
@@ -77,10 +79,18 @@ describe('test ido', async () => {
     launchpad = await WrappedSmartContract.create(codeCell, dataCell);
     account1TimeLock = await WrappedSmartContract.create(timelockCode,
       beginCell().storeUint(releaseTime, 64).storeAddress(account1).endCell());
-    setNetworkConfig(sourceJetton);
-    setNetworkConfig(soldJetton);
-    setNetworkConfig(launchpad);
-    setNetworkConfig(account1TimeLock);
+    const launchpadData = await launchpad.contract.invokeGetMethod("get_info", []);
+    expect(launchpadData.result[0] as bigint).to.be.eq(BigInt(releaseTime));
+    expect(launchpadData.result[1] as bigint).to.be.eq(BigInt(exRate));
+    expect((launchpadData.result[2] as Slice).loadAddress().toString()).to.be.eq(sourceJetton.address.toString());
+    expect((launchpadData.result[3] as Slice).loadAddress().toString()).to.be.eq(soldJetton.address.toString());
+    expect(launchpadData.result[4] as bigint).to.be.eq(BigInt(cap));
+    expect(launchpadData.result[5] as bigint).to.be.eq(BigInt(received));
+    expect((launchpadData.result[8] as Slice).loadAddress().toString()).to.be.eq(owner.toString());
+    expect((launchpadData.result[6] as Cell).toBoc().toString('hex'))
+      .to.be.eq(JETTON_WALLET_CODE.toBoc().toString('hex'));
+    expect((launchpadData.result[7] as Cell).toBoc().toString('hex'))
+      .to.be.eq(timelockCode.toBoc().toString('hex'));
   });
   it('prepare Jetton', async () => {
     // mint source Jetton
@@ -118,39 +128,50 @@ describe('test ido', async () => {
     const res = await account1SourceJettonWallet.contract.sendInternalMessage(
       internalMessage({
         from: account1,
-        body: JettonWallet.transferBody(launchpad.address, base),
-        value: toNano('0.2'),
+        body: JettonWallet.transferBody(launchpad.address, base, toNano('0.5')),
+        value: toNano('1'),
       })
     );
-    console.log(res.actionList);
     // launchpad wallet receive source jetton
     launchpadSourceJettonWallet = await getJWalletContract(launchpad.address, sourceJetton.address);
     const res1 = await launchpadSourceJettonWallet.contract.sendInternalMessage(
       actionToMessage(account1SourceJettonWallet.address, res.actionList[0])
     );
-    console.log(res1.actionList,'fix fix');
-    // launchpad wallet notice launchpad received
-    const res2 = await launchpad.contract.sendInternalMessage(
-      actionToMessage(launchpadSourceJettonWallet.address, res1.actionList[0])
-    );
-    console.log(res2.actionList);
-    // launchpad send token to account1 timelock
-    account1TimeLockSoldJettonWallet = await getJWalletContract(account1TimeLock.address, soldJetton.address);
-    await account1TimeLockSoldJettonWallet.contract.sendInternalMessage(
-      actionToMessage(launchpad.address, res2.actionList[0])
-    );
-
-    const {balance} = parseJettonWalletDetails(
+    const {balance, owner: _launchpad} = parseJettonWalletDetails(
       await launchpadSourceJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
     )
     expect(balance).to.be.eq(BigInt(base));
+    expect(_launchpad.toString()).to.be.eq(launchpad.address.toString());
+
+    const launchpadWalletInfo = await launchpad.contract.invokeGetMethod('get_jetton_wallet_addr', []);
+    expect((launchpadWalletInfo.result[0] as Slice).loadAddress().toString()).to.be.eq(launchpadSourceJettonWallet.address.toString());
+    // launchpad source jetton wallet notice launchpad received
+    const res2 = await launchpad.contract.sendInternalMessage(
+      actionToMessage(launchpadSourceJettonWallet.address, res1.actionList[0])
+    );
+    // launchpad notice launchpad sold jetton wallet transfer token
+    const res3 = await launchpadSoldJettonWallet.contract.sendInternalMessage(
+      actionToMessage(launchpad.address, res2.actionList[0])
+    );
+    // account1 timelock sold jetton wallet received sold token
+    account1TimeLockSoldJettonWallet = await getJWalletContract(account1TimeLock.address, soldJetton.address);
+    await account1TimeLockSoldJettonWallet.contract.sendInternalMessage(
+      actionToMessage(launchpadSoldJettonWallet.address, res3.actionList[0])
+    );
+
+    const {balance: soldJBalance} = await parseJettonWalletDetails(
+      await launchpadSoldJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
+    )
+    expect(soldJBalance).to.be.eq(BigInt((cap - base) * exRate / base));
+
+    const {balance: accountBalance} = await parseJettonWalletDetails(
+      await account1TimeLockSoldJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
+    )
+    expect(accountBalance).to.be.eq(BigInt(base * exRate / base));
     const launchpadData = await launchpad.contract.invokeGetMethod("get_info", []);
     const received = launchpadData.result[5] as bigint;
+    console.log(launchpadData.type, launchpadData.exit_code, launchpadData.result);
     expect(received).to.be.eq(BigInt(base));
-    const {balance: soldJBalance} = parseJettonWalletDetails(
-      await launchpadSourceJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
-    )
-    expect(soldJBalance).to.be.eq(BigInt(base * exRate / base));
   });
   it('cannot participate after end time', async () => {
     for (; ;) {
@@ -212,7 +233,7 @@ describe('test ido', async () => {
     expect(balanceAfter).to.be.eq(BigInt(0))
   });
   it('owner claim unsold Jetton', async () => {
-    const launchpadSoldJettonWallet = await getJWalletContract(launchpad.address, soldJetton.address);
+    launchpadSoldJettonWallet = await getJWalletContract(launchpad.address, soldJetton.address);
     const {balance: balanceBefore} = parseJettonWalletDetails(
       await launchpadSoldJettonWallet.contract.invokeGetMethod("get_wallet_data", [])
     );
