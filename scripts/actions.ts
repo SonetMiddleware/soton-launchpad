@@ -26,6 +26,7 @@ async function claimSoldJetton(launchpadAddr: Address) {
   let states = await client.getContractState(accountTimeLock);
   if (!states.code || !states.data) {
     // deploy time lock address
+    console.log("deploy time lock by self...");
     let seq = await wallet.getSeqno();
     let timelockCode = Cell.fromBoc(fs.readFileSync("../build/timelock.cell"))[0];
     let dataCell = beginCell().storeUint(launchpadState.releaseTime, 64).storeAddress(account).endCell();
@@ -46,7 +47,6 @@ async function claimSoldJetton(launchpadAddr: Address) {
         break;
       }
     }
-    console.log('deploy time lock by self');
     // throw new Error('time lock not deployed');
   }
   const accountTimeLockSoldJettonWallet = await getJWalletContract(accountTimeLock, launchpadState.soldJetton);
@@ -107,8 +107,8 @@ async function ownerClaimUnsoldJetton(launchpadAddr: Address) {
   await wallet.send(transfer);
 }
 
-// EQBq42bVIw0FHTWvDbUOUWPf0E4Dt7hvSMNoD4Nho1EK_5Tj
-claimSoldJetton(Address.parse("EQDVIide8E9AcOBfrVyhNYWsnzM_-qicgo57fb4ebE2lBwpb")).then(() => process.exit(0)).catch(e => {
+// EQB8R4EKx9Ofg08mGChyedPnXS4KvjB2e7AaLLnsoA0O_7g3
+ownerClaimSourceJettonOrTon(Address.parse("EQBvGW6oD7y-tSenGJ-z9yV_NsCh0GElQ2B5CF-rxy6IXriH")).then(() => process.exit(0)).catch(e => {
   console.log(e);
   process.exit(1);
 });

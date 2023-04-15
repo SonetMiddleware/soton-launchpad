@@ -31,7 +31,13 @@ export async function deployLaunchPad(releaseTime: number, cap: number | bigint,
   const idoAddr = contractAddress(0, init);
   let transfer = await wallet.createTransfer({
     seqno: await wallet.getSeqno(), messages: [
-      internal({ to: idoAddr, value: toNano("0.1"), init: init })
+      internal({
+        to: idoAddr,
+        value: toNano("0.1"),
+        init: init,
+        // if deploy TON launchpad, write anything to body
+        body: sourceJetton ? new Cell() : beginCell().storeUint(1, 1).endCell()
+      })
     ], secretKey: key.secretKey
   });
   await wallet.send(transfer);

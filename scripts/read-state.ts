@@ -40,7 +40,8 @@ export async function getLaunchpadInfo(launchpadAddr: Address) {
   return {
     releaseTime: launchpadData.result[0] as bigint,
     exRate: launchpadData.result[1] as bigint,
-    sourceJetton: (launchpadData.result[2] as Slice).loadAddress(),
+    sourceJetton: (launchpadData.result[2] as Slice).remainingBits > 2 ?
+      (launchpadData.result[2] as Slice).loadAddress() : null,
     soldJetton: (launchpadData.result[3] as Slice).loadAddress(),
     cap: launchpadData.result[4] as bigint,
     received: launchpadData.result[5] as bigint,

@@ -118,15 +118,15 @@ async function newAndParticipateIdoByTON() {
   // participate
   // transfer TON to launchpad straightly without body
   const transfer1 = await wallet.createTransfer({
-    seqno: seqCurrent, messages: [
+    seqno: await wallet.getSeqno(), messages: [
       internal({
         to: launchpad.address,
-        value: toNano("1") // buy with 0.1 TON
+        value: toNano("0.5") + 100000000n // buy with 0.5 TON, 10000000n is Mint Message Fee
       })
     ], secretKey: key.secretKey
   });
   await wallet.send(transfer1);
-  console.log("buy with 1 TON");
+  console.log("buy with 0.5 TON");
 }
 
 newAndParticipateIdoByTON().then(() => process.exit(0)).catch(e => console.log(e));
