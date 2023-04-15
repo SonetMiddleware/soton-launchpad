@@ -61,10 +61,10 @@ async function newAndParticipateIdoByJetton() {
     seqno: await wallet.getSeqno(), messages: [
       internal({
         to: sourceJettonWallet.address,
-        value: toNano("0.2"),
+        value: toNano("0.25"),
         // pass forward amount > 0 so that launchpad could receive transfer notification
         // forward amount should be less than value
-        body: JettonWallet.transferBody(launchpad.address, amount, toNano("0.15"))
+        body: JettonWallet.transferBody(launchpad.address, amount, toNano("0.2"))
       })
     ], secretKey: key.secretKey
   });
@@ -78,7 +78,7 @@ async function newAndParticipateIdoByTON() {
   let soldJettonAddr = Address.parse("EQAjJTzAyKOHuyTpqcLLgNdTdJcbRfmxm9kNCJvvESADqwHK");
   let soldJettonWallet = await getJWalletContract(wallet.address, soldJettonAddr);
   console.log("soldJettonWallet, %s", soldJettonWallet.address);
-  let releaseTime = Math.ceil(Date.now() / 1000 + 10 * 60);
+  let releaseTime = Math.ceil(Date.now() / 1000 + 5 * 60);
   let cap = toNano("10");
   const owner = wallet.address;
   const exRate = base * 2; // 1 SOURCE = 2 SOLD
@@ -99,7 +99,7 @@ async function newAndParticipateIdoByTON() {
     seqno: seqCurrent, messages: [
       internal({
         to: soldJettonWallet.address,
-        value: toNano("0.5"),
+        value: toNano("0.1"),
         body: JettonWallet.transferBody(launchpad.address, soldAmount)
       })
     ], secretKey: key.secretKey
@@ -121,7 +121,7 @@ async function newAndParticipateIdoByTON() {
     seqno: seqCurrent, messages: [
       internal({
         to: launchpad.address,
-        value: toNano("1") // buy with 1 TON
+        value: toNano("1") // buy with 0.1 TON
       })
     ], secretKey: key.secretKey
   });
@@ -129,4 +129,4 @@ async function newAndParticipateIdoByTON() {
   console.log("buy with 1 TON");
 }
 
-newAndParticipateIdoByJetton().then(() => process.exit(0)).catch(e => console.log(e));
+newAndParticipateIdoByTON().then(() => process.exit(0)).catch(e => console.log(e));

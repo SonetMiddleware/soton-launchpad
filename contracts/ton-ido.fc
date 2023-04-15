@@ -123,13 +123,11 @@ const base = 1000000;
     .store_dict(data)
     .store_uint(0, 1)
     .end_cell();
-  slice to = begin_cell().store_uint(4, 3)
+  return begin_cell().store_uint(4, 3)
     .store_int(workchain(), 8)
     .store_uint(cell_hash(state_init), 256)
     .end_cell()
     .begin_parse();
-  send_message_with_stateinit(0, to, state_init, begin_cell().end_cell(), NORMAL);
-  return to;
 }
 
 (int, int, slice, slice, int, int, cell, cell, slice) get_info() method_id {

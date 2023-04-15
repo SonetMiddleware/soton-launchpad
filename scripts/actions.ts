@@ -15,13 +15,14 @@ async function claimSoldJetton(launchpadAddr: Address) {
   let { wallet, key } = await getWallet();
   const account = wallet.address;
   const launchpadState = await getLaunchpadInfo(launchpadAddr);
-  // if (Date.now() / 1000 < launchpadState.releaseTime) {
-  //   throw new Error("not end");
-  // }
+  if (Date.now() / 1000 < launchpadState.releaseTime) {
+    throw new Error("not end");
+  }
   const accountTimeLock = await getAccountTimeLockAddr(account, launchpadState.releaseTime);
   let client = new TonClient({
     endpoint: "https://testnet.toncenter.com/api/v2/jsonRPC", apiKey: api_key
   });
+  console.log("time lock address is", accountTimeLock.toString());
   let states = await client.getContractState(accountTimeLock);
   if (!states.code || !states.data) {
     // deploy time lock address
@@ -45,8 +46,9 @@ async function claimSoldJetton(launchpadAddr: Address) {
         break;
       }
     }
+    console.log('deploy time lock by self');
+    // throw new Error('time lock not deployed');
   }
-  console.log("time lock address is", accountTimeLock.toString());
   const accountTimeLockSoldJettonWallet = await getJWalletContract(accountTimeLock, launchpadState.soldJetton);
   // SOLD jetton stored at timeLock contract before release time
   const purchasedAmount = await getAccountJettonBalance(accountTimeLock, launchpadState.soldJetton);
@@ -105,7 +107,8 @@ async function ownerClaimUnsoldJetton(launchpadAddr: Address) {
   await wallet.send(transfer);
 }
 
-ownerClaimUnsoldJetton(Address.parse("EQDKj33QnH8tVrmLLHp8A1sptSpgsq3WbOdaXosKE1DiiiGy")).then(() => process.exit(0)).catch(e => {
+// EQBq42bVIw0FHTWvDbUOUWPf0E4Dt7hvSMNoD4Nho1EK_5Tj
+claimSoldJetton(Address.parse("EQDVIide8E9AcOBfrVyhNYWsnzM_-qicgo57fb4ebE2lBwpb")).then(() => process.exit(0)).catch(e => {
   console.log(e);
   process.exit(1);
 });
