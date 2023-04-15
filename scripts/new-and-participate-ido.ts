@@ -56,15 +56,15 @@ async function newAndParticipateIdoByJetton() {
 
   // participate
   // transfer source Jetton to launchpad: invoke source jetton wallet contract
-  const amount = 10 ** 9; // buy with 1 source, decimal is 9
+  const amount = toNano("1"); // buy with 1 source, decimal is 9
   const transfer1 = await wallet.createTransfer({
     seqno: await wallet.getSeqno(), messages: [
       internal({
         to: sourceJettonWallet.address,
-        value: toNano("1"),
+        value: toNano("0.2"),
         // pass forward amount > 0 so that launchpad could receive transfer notification
         // forward amount should be less than value
-        body: JettonWallet.transferBody(launchpad.address, amount, toNano("0.5"))
+        body: JettonWallet.transferBody(launchpad.address, amount, toNano("0.15"))
       })
     ], secretKey: key.secretKey
   });
@@ -129,4 +129,4 @@ async function newAndParticipateIdoByTON() {
   console.log("buy with 1 TON");
 }
 
-newAndParticipateIdoByTON().then(() => process.exit(0)).catch(e => console.log(e));
+newAndParticipateIdoByJetton().then(() => process.exit(0)).catch(e => console.log(e));

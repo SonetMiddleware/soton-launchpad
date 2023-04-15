@@ -82,16 +82,16 @@ const base = 1000000;
     if (ended | exceed) { ;; refund
       var body = create_simple_transfer_body(query_id, 0, jetton_amount, from_user);
       body = body.store_uint(0, 32); ;; append exit code
-      send_simple_message(100000000, source_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS);
+      send_simple_message(100000000, source_jetton_wallet, body.end_cell(), NORMAL | IGNORE_ERRORS);
       return ();
     }
     ;; calculate amount out
     int out_amount = jetton_amount * ex_rate / base;
     ;; send jetton to time lock
     var body = create_simple_transfer_body(query_id, 0, out_amount,
-      calculate_time_lock_addr(timelock_code, release_time, from_user));
+      deploy_time_lock(timelock_code, release_time, from_user));
     body = body.store_uint(0, 32); ;; append exit code
-    send_simple_message(100000000, sold_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS);
+    send_simple_message(100000000, sold_jetton_wallet, body.end_cell(), NORMAL | IGNORE_ERRORS);
     received += jetton_amount;
     save_data(release_time, ex_rate, source_jetton_address, sell_jetton_address, cap, received, jetton_wallet_code,
       timelock_code, owner);
@@ -105,19 +105,19 @@ const base = 1000000;
   if (op == 1) { ;; claim source Jetton
     var body = create_simple_transfer_body(query_id, 0, received, owner);
     body = body.store_uint(0, 32); ;; append exit code
-    send_simple_message(my_balance, source_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS);
+    send_simple_message(0, source_jetton_wallet, body.end_cell(), CARRY_ALL_BALANCE | IGNORE_ERRORS);
     return ();
   }
   if(op == 2) { ;; claim remained(unsold) Jetton
     int remained = in_msg_body~load_uint(64);
     var body = create_simple_transfer_body(query_id, 0, remained, owner);
     body = body.store_uint(0, 32); ;; append exit code
-    send_simple_message(my_balance, sold_jetton_wallet, body.end_cell(), CARRY_REMAINING_GAS);
+    send_simple_message(0, sold_jetton_wallet, body.end_cell(), CARRY_ALL_BALANCE | IGNORE_ERRORS);
     return ();
   }
 }
 
-(slice) calculate_time_lock_addr(cell time_lock_code, int end_time, slice owner) {
+(slice) deploy_time_lock(cell time_lock_code, int end_time, slice owner) {
   var data = begin_cell()
     .store_uint(end_time, 64)
     .store_slice(owner)
@@ -128,11 +128,13 @@ const base = 1000000;
     .store_dict(data)
     .store_uint(0, 1)
     .end_cell();
-  return begin_cell().store_uint(4, 3)
+  slice to = begin_cell().store_uint(4, 3)
     .store_int(workchain(), 8)
     .store_uint(cell_hash(state_init), 256)
     .end_cell()
     .begin_parse();
+  send_message_with_stateinit(0, to, state_init, begin_cell().end_cell(), NORMAL);
+  return to;
 }
 
 

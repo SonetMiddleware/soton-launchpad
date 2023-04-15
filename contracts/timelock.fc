@@ -40,6 +40,7 @@
   throw_unless(403, now() > end_time);
 
   (slice dest, cell payload) = (in_msg_body~load_msg_addr(), in_msg_body~load_ref());
+
   ;; forward msg
-  send_simple_message(my_balance, dest, payload, CARRY_ALL_BALANCE | IGNORE_ERRORS);
+  send_simple_message(0, dest, payload, CARRY_ALL_BALANCE | IGNORE_ERRORS);
 }

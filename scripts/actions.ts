@@ -1,19 +1,53 @@
-import { Address, beginCell, internal, toNano } from "ton";
+import { Address, beginCell, Cell, internal, toNano, TonClient } from "ton";
 import {
   getAccountJettonBalance,
   getAccountTimeLockAddr,
-  getAccountTimeLockSoldJettonWallet,
   getLaunchpadInfo
 } from "./read-state";
+import { api_key } from "../env.json";
 import { getWallet } from "./get-wallet";
 import { JettonWallet } from "../test/jetton-lib/jetton-wallet";
+import { getJWalletContract } from "../test/jetton-lib/jetton-utils";
+import fs from "fs";
+import { sleep } from "../test/helpers";
 
 async function claimSoldJetton(launchpadAddr: Address) {
   let { wallet, key } = await getWallet();
   const account = wallet.address;
   const launchpadState = await getLaunchpadInfo(launchpadAddr);
+  // if (Date.now() / 1000 < launchpadState.releaseTime) {
+  //   throw new Error("not end");
+  // }
   const accountTimeLock = await getAccountTimeLockAddr(account, launchpadState.releaseTime);
-  const accountTimeLockSoldJetton = await getAccountTimeLockSoldJettonWallet(account, launchpadState.releaseTime, launchpadState.soldJetton);
+  let client = new TonClient({
+    endpoint: "https://testnet.toncenter.com/api/v2/jsonRPC", apiKey: api_key
+  });
+  let states = await client.getContractState(accountTimeLock);
+  if (!states.code || !states.data) {
+    // deploy time lock address
+    let seq = await wallet.getSeqno();
+    let timelockCode = Cell.fromBoc(fs.readFileSync("../build/timelock.cell"))[0];
+    let dataCell = beginCell().storeUint(launchpadState.releaseTime, 64).storeAddress(account).endCell();
+    const deploy = await wallet.createTransfer({
+      seqno: seq, messages: [
+        internal({
+          to: accountTimeLock, // invoke time lock to release
+          value: toNano("0.1"),
+          init: { code: timelockCode, data: dataCell }
+        })
+      ], secretKey: key.secretKey
+    });
+    await wallet.send(deploy);
+    for (; ;) {
+      await sleep(2000);
+      let curSeq = await wallet.getSeqno();
+      if (curSeq > seq) {
+        break;
+      }
+    }
+  }
+  console.log("time lock address is", accountTimeLock.toString());
+  const accountTimeLockSoldJettonWallet = await getJWalletContract(accountTimeLock, launchpadState.soldJetton);
   // SOLD jetton stored at timeLock contract before release time
   const purchasedAmount = await getAccountJettonBalance(accountTimeLock, launchpadState.soldJetton);
   console.log("purchased amount is", purchasedAmount);
@@ -21,8 +55,8 @@ async function claimSoldJetton(launchpadAddr: Address) {
     seqno: await wallet.getSeqno(), messages: [
       internal({
         to: accountTimeLock, // invoke time lock to release
-        value: toNano("0.01"),
-        body: beginCell().storeAddress(accountTimeLockSoldJetton.address) // let time lock to invoke account time lock sold jetton wallet to release jetton
+        value: toNano("0.1"),
+        body: beginCell().storeAddress(accountTimeLockSoldJettonWallet.address) // let time lock to invoke account time lock sold jetton wallet to release jetton
           .storeRef(JettonWallet.transferBody(account, purchasedAmount)).endCell()
       })
     ], secretKey: key.secretKey
@@ -71,7 +105,7 @@ async function ownerClaimUnsoldJetton(launchpadAddr: Address) {
   await wallet.send(transfer);
 }
 
-ownerClaimUnsoldJetton(Address.parse("EQBazzDVtlUAyrsy-ReCC_7zMbpO8H0TRqxwgXnfO9cUZbDn")).then(() => process.exit(0)).catch(e => {
+ownerClaimUnsoldJetton(Address.parse("EQDKj33QnH8tVrmLLHp8A1sptSpgsq3WbOdaXosKE1DiiiGy")).then(() => process.exit(0)).catch(e => {
   console.log(e);
   process.exit(1);
 });

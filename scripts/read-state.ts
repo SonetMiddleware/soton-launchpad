@@ -10,10 +10,6 @@ export function getAccountTimeLockAddr(account: Address, endTime: number | bigin
   return contractAddress(0, { code: timelockCode, data: dataCell });
 }
 
-export async function getAccountTimeLockSoldJettonWallet(account: Address, endTime: number | bigint, soldJettonAddr: Address) {
-  return await getJWalletContract(getAccountTimeLockAddr(account, endTime), soldJettonAddr);
-}
-
 export async function getAccountJettonBalance(account: Address, jetton: Address) {
   let client = new TonClient({
     endpoint: "https://testnet.toncenter.com/api/v2/jsonRPC", apiKey: api_key
@@ -54,12 +50,12 @@ export async function getLaunchpadInfo(launchpadAddr: Address) {
   };
 }
 
-getAccountJettonBalance(Address.parse("kQDTp1mFvDvJ4xNyzS7Ot1zvtd8xlEy3w1DPGopAJfESCgB5"), Address.parse("kQBajc2rmhof5AR-99pfLmoUlV3Nzcle6P_Mc_KnacsViccN"))
-  .then((balance) => {
-    console.log(balance);
-    process.exit(0);
-  })
-  .catch(e => {
-    console.log(e);
-    process.exit(0);
-  });
+// getAccountJettonBalance(Address.parse("kQDTp1mFvDvJ4xNyzS7Ot1zvtd8xlEy3w1DPGopAJfESCgB5"), Address.parse("kQBajc2rmhof5AR-99pfLmoUlV3Nzcle6P_Mc_KnacsViccN"))
+//   .then((balance) => {
+//     console.log(balance);
+//     process.exit(0);
+//   })
+//   .catch(e => {
+//     console.log(e);
+//     process.exit(0);
+//   });
