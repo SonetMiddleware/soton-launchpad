@@ -33,10 +33,8 @@ export async function deployLaunchPad(releaseTime: number, cap: number | bigint,
     seqno: await wallet.getSeqno(), messages: [
       internal({
         to: idoAddr,
-        value: toNano("0.1"),
-        init: init,
-        // if deploy TON launchpad, write anything to body
-        body: sourceJetton ? new Cell() : beginCell().storeUint(1, 1).endCell()
+        value: toNano("0.15"),
+        init: init
       })
     ], secretKey: key.secretKey
   });

@@ -107,8 +107,7 @@ async function ownerClaimUnsoldJetton(launchpadAddr: Address) {
   await wallet.send(transfer);
 }
 
-// EQB8R4EKx9Ofg08mGChyedPnXS4KvjB2e7AaLLnsoA0O_7g3
-ownerClaimSourceJettonOrTon(Address.parse("EQBvGW6oD7y-tSenGJ-z9yV_NsCh0GElQ2B5CF-rxy6IXriH")).then(() => process.exit(0)).catch(e => {
-  console.log(e);
-  process.exit(1);
-});
+// ownerClaimSourceJettonOrTon(Address.parse("EQDSMVdOmOBZVKcNNJVXy0mH2H6apOGirrfU2gVNyp8Wwo3a")).then(() => process.exit(0)).catch(e => {
+//   console.log(e);
+//   process.exit(1);
+// });
