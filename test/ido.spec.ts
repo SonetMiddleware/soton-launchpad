@@ -8,7 +8,7 @@ import {JettonMinter} from "./jetton-lib/jetton-minter";
 import {JETTON_MINTER_CODE, JETTON_WALLET_CODE, jettonMinterInitData} from "../build/jetton-minter.deploy";
 import {JettonWallet} from "./jetton-lib/jetton-wallet";
 import {WrappedSmartContract} from "./jetton-lib/wrapped-smart-contract";
-import {parseJettonWalletDetails} from "./jetton-lib/jetton-utils";
+import { getJWalletContract, parseJettonWalletDetails } from "./jetton-lib/jetton-utils";
 import {actionToMessage} from "./jetton-lib/utils";
 
 chai.use(chaiBN(BN));
@@ -16,20 +16,6 @@ chai.use(chaiBN(BN));
 const base = 1000000;
 const op_transfer_notification = 0x7362d09c;
 const op_internal_transfer = 0x178D4519;
-
-const getJWalletContract = async (
-  walletOwnerAddress: Address,
-  jettonMasterAddress: Address
-): Promise<JettonWallet> =>
-  await JettonWallet.create(
-    JETTON_WALLET_CODE,
-    beginCell()
-      .storeCoins(0)
-      .storeAddress(walletOwnerAddress)
-      .storeAddress(jettonMasterAddress)
-      .storeRef(JETTON_WALLET_CODE)
-      .endCell()
-  );
 
 describe('test ido', async () => {
   let timelockCode = Cell.fromBoc(fs.readFileSync("build/timelock.cell"))[0];

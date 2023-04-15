@@ -1,11 +1,11 @@
 // TODO: possibly use this outside tests
 
-import {Address, beginCell, Cell} from "ton";
-import {WrappedSmartContract} from "./wrapped-smart-contract";
-import {OPS} from "./ops";
+import { Address, beginCell, Cell } from "ton";
+import { WrappedSmartContract } from "./wrapped-smart-contract";
+import { OPS } from "./ops";
 
 export class JettonWallet extends WrappedSmartContract {
-  static transferBody(toOwnerAddress: Address, jettonValue: number, forwardAmount?: bigint): Cell {
+  static transferBody(toOwnerAddress: Address, jettonValue: number | bigint, forwardAmount?: bigint): Cell {
     return beginCell()
       .storeUint(OPS.Transfer, 32)
       .storeUint(0, 64) // queryid
