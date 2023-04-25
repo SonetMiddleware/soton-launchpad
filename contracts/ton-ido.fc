@@ -77,8 +77,9 @@ const base = 1000000;
     throw_unless(302, buy_amount > 0);
     ;; ended or exceed max cap
     var ended = release_time < now();
+    var not_started = now() < start_time;
     var exceed = received + buy_amount > cap;
-    if (ended | exceed) { ;; refund buy_amount, not all amount
+    if (not_started | ended | exceed) { ;; refund buy_amount, not all amount
       send_simple_message(buy_amount, sender_address, begin_cell().end_cell(), NORMAL | IGNORE_ERRORS);
       return ();
     }

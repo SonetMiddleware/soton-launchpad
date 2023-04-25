@@ -81,8 +81,9 @@ const base = 1000000;
     (int jetton_amount, slice from_user) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr());
     ;; ended or exceed max cap
     var ended = release_time < now();
+    var not_started = now() < start_time;
     var exceed = received + jetton_amount > cap;
-    if (ended | exceed) { ;; refund
+    if (not_started | ended | exceed) { ;; refund
       var body = create_simple_transfer_body(query_id, 0, jetton_amount, from_user);
       body = body.store_uint(0, 32); ;; append exit code
       send_simple_message(100000000, source_jetton_wallet, body.end_cell(), NORMAL | IGNORE_ERRORS);
