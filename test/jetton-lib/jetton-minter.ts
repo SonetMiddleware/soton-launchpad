@@ -1,9 +1,9 @@
 // TODO: possibly use this outside tests
 
 import BN from "bn.js";
-import {Address, beginCell, Cell, Slice, toNano} from "ton";
-import {WrappedSmartContract} from "./wrapped-smart-contract";
-import {OPS} from "./ops";
+import { Address, beginCell, Cell, Slice, toNano } from "ton";
+import { WrappedSmartContract } from "./wrapped-smart-contract";
+import { OPS } from "./ops";
 
 export class JettonMinter extends WrappedSmartContract {
   async getWalletAddress(forTonWalletAddress: Address): Promise<Address> {
@@ -11,11 +11,7 @@ export class JettonMinter extends WrappedSmartContract {
       // TODO(sy) ['tvm.Slice', cellBoc] => also a less desired API (tonclient)
       {
         type: "cell_slice",
-        value: beginCell()
-          .storeAddress(forTonWalletAddress)
-          .endCell()
-          .toBoc({idx: false})
-          .toString("base64"),
+        value: beginCell().storeAddress(forTonWalletAddress).endCell().toBoc({ idx: false }).toString("base64"),
       },
     ]);
 
@@ -27,7 +23,7 @@ export class JettonMinter extends WrappedSmartContract {
       .storeUint(OPS.Mint, 32) // opcode (reference TODO)
       .storeUint(0, 64) // queryid
       .storeAddress(ownerAddress)
-      .storeCoins(toNano('0.2')) // gas fee
+      .storeCoins(toNano("0.2")) // gas fee
       .storeRef(
         // internal transfer message
         beginCell()

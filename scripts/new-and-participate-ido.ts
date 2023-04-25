@@ -1,16 +1,16 @@
-import { getWallet } from "./get-wallet";
-import { getJWalletContract } from "../test/jetton-lib/jetton-utils";
-import { Address, beginCell, Cell, internal, toNano } from "ton";
-import { deployLaunchPad } from "./deploy-ido";
-import { internalMessage, sleep } from "../test/helpers";
-import { JettonWallet } from "../test/jetton-lib/jetton-wallet";
-import { WrappedSmartContract } from "../test/jetton-lib/wrapped-smart-contract";
+import {getWallet} from "./get-wallet";
+import {getJWalletContract} from "../test/jetton-lib/jetton-utils";
+import {Address, beginCell, Cell, internal, toNano} from "ton";
+import {deployLaunchPad} from "./deploy-ido";
+import {internalMessage, sleep} from "../test/helpers";
+import {JettonWallet} from "../test/jetton-lib/jetton-wallet";
+import {WrappedSmartContract} from "../test/jetton-lib/wrapped-smart-contract";
 import fs from "fs";
 
 const base = 1000000;
 
 async function newAndParticipateIdoByJetton() {
-  let { wallet, key } = await getWallet();
+  let {wallet, key} = await getWallet();
   let seqBefore = await wallet.getSeqno();
   let sourceJettonAddr = Address.parse("kQBajc2rmhof5AR-99pfLmoUlV3Nzcle6P_Mc_KnacsViccN");
   let sourceJettonWallet = await getJWalletContract(wallet.address, sourceJettonAddr);
@@ -18,11 +18,13 @@ async function newAndParticipateIdoByJetton() {
   let soldJettonWallet = await getJWalletContract(wallet.address, soldJettonAddr);
   console.log("sourceJettonWallet, %s", sourceJettonWallet.address);
   console.log("soldJettonWallet, %s", soldJettonWallet.address);
-  let releaseTime = Math.ceil(Date.now() / 1000 + 5 * 60);
+  let startTime = Math.ceil(Date.now() / 1000);
+  let duration = 5 * 60;
+  // let releaseTime = startTime + duration;
   let cap = toNano("10");
   const owner = wallet.address;
   const exRate = base * 2; // 1 SOURCE = 2 SOLD
-  let launchpad = await deployLaunchPad(releaseTime, cap, owner, exRate, soldJettonAddr, sourceJettonAddr);
+  let launchpad = await deployLaunchPad(startTime, duration, cap, owner, exRate, soldJettonAddr, sourceJettonAddr);
   let seqCurrent;
   for (; ;) {
     await sleep(2000);
@@ -73,17 +75,19 @@ async function newAndParticipateIdoByJetton() {
 }
 
 async function newAndParticipateIdoByTON() {
-  let { wallet, key } = await getWallet();
+  let {wallet, key} = await getWallet();
   let seqBefore = await wallet.getSeqno();
   let soldJettonAddr = Address.parse("EQAjJTzAyKOHuyTpqcLLgNdTdJcbRfmxm9kNCJvvESADqwHK");
   let soldJettonWallet = await getJWalletContract(wallet.address, soldJettonAddr);
   console.log("soldJettonWallet, %s", soldJettonWallet.address);
-  let releaseTime = Math.ceil(Date.now() / 1000 + 5 * 60);
+  let startTime = Math.ceil(Date.now() / 1000);
+  let duration = 5 * 60;
+  // let releaseTime = startTime + duration;
   let cap = toNano("10");
   const owner = wallet.address;
   const exRate = base * 2; // 1 SOURCE = 2 SOLD
   // sourceJetton is undefined, so IDO is use TON
-  let launchpad = await deployLaunchPad(releaseTime, cap, owner, exRate, soldJettonAddr, undefined);
+  let launchpad = await deployLaunchPad(startTime, duration, cap, owner, exRate, soldJettonAddr, undefined);
   console.log("deploy launchpad, %s", launchpad.address);
   let seqCurrent;
   for (; ;) {

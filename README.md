@@ -2,6 +2,12 @@
 
 TON Launchpad(for test only)
 
+## TODO
+
+- each test file can succeed when run separately, but it will fail when run in one command
+  - comment all content of [ido.spec.ts](./test/ido.spec.ts) and [testnet.spec.ts](./test/testnet.spec.ts)
+  - run `npm run test`, all case in [ton-ido.spec.ts] will success
+
 ## Deployed At Testnet
 
 ### Jetton

@@ -9,12 +9,13 @@ const transfer_notification = 0x7362d09c;
 const base = 1000000;
 
 ;; exRate decimal is 6
-() save_data(int release_time, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap, int received,
-  cell jetton_wallet_code, cell timelock_code, slice owner) impure inline {
+() save_data(int start_time, int duration, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap,
+  int received, cell jetton_wallet_code, cell timelock_code, slice owner) impure inline {
   set_data(begin_cell()
     .store_ref(
       begin_cell()
-        .store_uint(release_time, 64)
+        .store_uint(start_time, 64)
+        .store_uint(duration, 64)
         .store_uint(ex_rate, 64)
         .store_uint(cap, 64)
         .store_uint(received, 64)
@@ -29,12 +30,13 @@ const base = 1000000;
   );
 }
 
-(int, int, slice, slice, int, int, cell, cell, slice) load_data(){
+(int, int, int, slice, slice, int, int, cell, cell, slice) load_data(){
   var ds = get_data().begin_parse();
   var uint_data = ds~load_ref().begin_parse();
   return
     (
-      uint_data~load_uint(64), ;; end time
+      uint_data~load_uint(64), ;; start time
+      uint_data~load_uint(64), ;; duration
       uint_data~load_uint(64), ;; exchange rate
       ds~load_msg_addr(), ;; source jetton
       ds~load_msg_addr(), ;; sold jetton
@@ -68,8 +70,9 @@ const base = 1000000;
   force_chain(sender_address);
 
   (int op, int query_id) = (in_msg_body~load_uint(32), in_msg_body~load_uint(64));
-  (int release_time, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap,
+  (int start_time, int duration, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap,
     int received, cell jetton_wallet_code, cell timelock_code, slice owner) = load_data();
+  int release_time = start_time + duration;
   var source_jetton_wallet = calculate_user_jetton_wallet_address(my_address(), source_jetton_address, jetton_wallet_code);
   var sold_jetton_wallet = calculate_user_jetton_wallet_address(my_address(), sell_jetton_address, jetton_wallet_code);
   if(op == transfer_notification) { ;; receive source Jetton
@@ -89,12 +92,12 @@ const base = 1000000;
     int out_amount = jetton_amount * ex_rate / base;
     ;; send jetton to time lock
     var body = create_simple_transfer_body(query_id, 0, out_amount,
-      deploy_time_lock(timelock_code, release_time, from_user));
+      calculate_time_lock_addr(timelock_code, release_time, from_user));
     body = body.store_uint(0, 32); ;; append exit code
     send_simple_message(100000000, sold_jetton_wallet, body.end_cell(), NORMAL | IGNORE_ERRORS);
     received += jetton_amount;
-    save_data(release_time, ex_rate, source_jetton_address, sell_jetton_address, cap, received, jetton_wallet_code,
-      timelock_code, owner);
+    save_data(start_time, duration, ex_rate, source_jetton_address, sell_jetton_address, cap, received,
+      jetton_wallet_code, timelock_code, owner);
     return ();
   }
   ;; only owner
@@ -117,7 +120,7 @@ const base = 1000000;
   }
 }
 
-(slice) deploy_time_lock(cell time_lock_code, int end_time, slice owner) {
+(slice) calculate_time_lock_addr(cell time_lock_code, int end_time, slice owner) {
   var data = begin_cell()
     .store_uint(end_time, 64)
     .store_slice(owner)
@@ -136,12 +139,12 @@ const base = 1000000;
 }
 
 
-(int, int, slice, slice, int, int, cell, cell, slice) get_info() method_id {
+(int, int, int, slice, slice, int, int, cell, cell, slice) get_info() method_id {
   return load_data();
 }
 
 (slice, slice) get_jetton_wallet_addr() method_id {
-  (int release_time, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap,
+  (int start_time, int duration, int ex_rate, slice source_jetton_address, slice sell_jetton_address, int cap,
     int received, cell jetton_wallet_code, cell timelock_code, slice owner) = load_data();
 
   var source_jetton_wallet = calculate_user_jetton_wallet_address(my_address(), source_jetton_address, jetton_wallet_code);

@@ -13,7 +13,7 @@ export function parseJettonDetails(execResult: { result: any[] }): JettonDetails
   return {
     totalSupply: execResult.result[0] as BN,
     address: (execResult.result[2] as Slice).loadAddress() as Address,
-    metadata: {}
+    metadata: {},
   };
 }
 
@@ -31,20 +31,12 @@ export function parseJettonWalletDetails(execResult: { result: any[] }): JettonW
   return {
     balance: execResult.result[0] as bigint,
     owner: (execResult.result[1] as Slice).loadAddress()!,
-    jettonMasterContract: (execResult.result[2] as Slice).loadAddress()!
+    jettonMasterContract: (execResult.result[2] as Slice).loadAddress()!,
   };
 }
 
-export const getJWalletContract = async (
-  walletOwnerAddress: Address,
-  jettonMasterAddress: Address
-): Promise<JettonWallet> =>
+export const getJWalletContract = async (walletOwnerAddress: Address, jettonMasterAddress: Address): Promise<JettonWallet> =>
   await JettonWallet.create(
     JETTON_WALLET_CODE,
-    beginCell()
-      .storeCoins(0)
-      .storeAddress(walletOwnerAddress)
-      .storeAddress(jettonMasterAddress)
-      .storeRef(JETTON_WALLET_CODE)
-      .endCell()
+    beginCell().storeCoins(0).storeAddress(walletOwnerAddress).storeAddress(jettonMasterAddress).storeRef(JETTON_WALLET_CODE).endCell()
   );

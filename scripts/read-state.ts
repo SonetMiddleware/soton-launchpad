@@ -1,13 +1,13 @@
-import { Address, beginCell, Cell, contractAddress, Slice, TonClient } from "ton";
-import { getJWalletContract, parseJettonWalletDetails } from "../test/jetton-lib/jetton-utils";
+import {Address, beginCell, Cell, contractAddress, Slice, TonClient} from "ton";
+import {getJWalletContract, parseJettonWalletDetails} from "../test/jetton-lib/jetton-utils";
 import fs from "fs";
-import { api_key } from "../env.json";
-import { WrappedSmartContract } from "../test/jetton-lib/wrapped-smart-contract";
+import {api_key} from "../env.json";
+import {WrappedSmartContract} from "../test/jetton-lib/wrapped-smart-contract";
 
 export function getAccountTimeLockAddr(account: Address, endTime: number | bigint) {
   let timelockCode = Cell.fromBoc(fs.readFileSync("../build/timelock.cell"))[0];
   let dataCell = beginCell().storeUint(endTime, 64).storeAddress(account).endCell();
-  return contractAddress(0, { code: timelockCode, data: dataCell });
+  return contractAddress(0, {code: timelockCode, data: dataCell});
 }
 
 export async function getAccountJettonBalance(account: Address, jetton: Address) {
@@ -21,7 +21,7 @@ export async function getAccountJettonBalance(account: Address, jetton: Address)
     throw new Error("ill contract");
   }
   let jWalletCurrent = await WrappedSmartContract.create(Cell.fromBoc(states.code)[0], Cell.fromBoc(states.data)[0]);
-  const { balance } = parseJettonWalletDetails(
+  const {balance} = parseJettonWalletDetails(
     await jWalletCurrent.contract.invokeGetMethod("get_wallet_data", [])
   );
   return balance;
@@ -38,25 +38,26 @@ export async function getLaunchpadInfo(launchpadAddr: Address) {
   let launchpad = await WrappedSmartContract.create(Cell.fromBoc(states.code)[0], Cell.fromBoc(states.data)[0]);
   const launchpadData = await launchpad.contract.invokeGetMethod("get_info", []);
   return {
-    releaseTime: launchpadData.result[0] as bigint,
-    exRate: launchpadData.result[1] as bigint,
-    sourceJetton: (launchpadData.result[2] as Slice).remainingBits > 2 ?
-      (launchpadData.result[2] as Slice).loadAddress() : null,
-    soldJetton: (launchpadData.result[3] as Slice).loadAddress(),
-    cap: launchpadData.result[4] as bigint,
-    received: launchpadData.result[5] as bigint,
-    JETTON_WALLET_CODE: launchpadData.result[6] as Cell,
-    timeLockCode: launchpadData.result[7] as Cell,
-    owner: (launchpadData.result[8] as Slice).loadAddress()
+    startTime: launchpadData.result[0] as bigint,
+    duration: launchpadData.result[1] as bigint,
+    exRate: launchpadData.result[2] as bigint,
+    sourceJetton: (launchpadData.result[3] as Slice).remainingBits > 2 ?
+      (launchpadData.result[3] as Slice).loadAddress() : null,
+    soldJetton: (launchpadData.result[4] as Slice).loadAddress(),
+    cap: launchpadData.result[5] as bigint,
+    received: launchpadData.result[6] as bigint,
+    JETTON_WALLET_CODE: launchpadData.result[7] as Cell,
+    timeLockCode: launchpadData.result[8] as Cell,
+    owner: (launchpadData.result[9] as Slice).loadAddress()
   };
 }
 
-// getAccountJettonBalance(Address.parse("kQDTp1mFvDvJ4xNyzS7Ot1zvtd8xlEy3w1DPGopAJfESCgB5"), Address.parse("kQBajc2rmhof5AR-99pfLmoUlV3Nzcle6P_Mc_KnacsViccN"))
-//   .then((balance) => {
-//     console.log(balance);
-//     process.exit(0);
-//   })
-//   .catch(e => {
-//     console.log(e);
-//     process.exit(0);
-//   });
+getLaunchpadInfo(Address.parse("kQBsDiMXpG6ZOHs3pp29h-VmCfT3TEGF1ne3-KC4LlGQAsco"))
+  .then((res) => {
+    console.log(res);
+    process.exit(0);
+  })
+  .catch(e => {
+    console.log(e);
+    process.exit(0);
+  });
